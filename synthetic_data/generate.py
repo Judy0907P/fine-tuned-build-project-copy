@@ -19,6 +19,7 @@ from synthetic_data.models import TitleVariants
 DEFAULT_PARAMS = {
     "model": "gpt-5-mini",
     "api_key_env": None,
+    "base_url_env": None,
     "num_examples_per_title": 10,
     "temperature": None,
     "reasoning_effort": "minimal",
@@ -236,7 +237,12 @@ async def generate_variations(
 
 async def run_pipeline(params: Dict, seed_df: pd.DataFrame) -> Tuple[pd.DataFrame, List[TitleVariants], Dict]:
     model_info = resolve_model(params["model"])
-    client = build_client(model_info, api_key_env=params.get("api_key_env"), async_mode=True)
+    client = build_client(
+        model_info,
+        api_key_env=params.get("api_key_env"),
+        base_url_env=params.get("base_url_env"),
+        async_mode=True,
+    )
 
     cache_path = Path(params["output_responses"])
     cached = load_existing_jsonl(cache_path, expected_model=model_info.model)
@@ -316,6 +322,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--temperature", type=float, help="Sampling temperature; omit for reasoning models")
     parser.add_argument("--reasoning-effort", type=str, help="Reasoning level (minimal/low/medium/high)")
     parser.add_argument("--max-concurrent", type=int, help="Maximum concurrent requests")
+    parser.add_argument("--api-key-env", type=str, help="Override API key env var name")
+    parser.add_argument("--base-url-env", type=str, help="Optional API base URL env var name (e.g., Azure)")
     parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt about LLM call volume")
     return parser.parse_args()
 
@@ -335,17 +343,23 @@ def main():
         params["reasoning_effort"] = args.reasoning_effort
     if args.max_concurrent:
         params["max_concurrent"] = args.max_concurrent
+    if args.api_key_env:
+        params["api_key_env"] = args.api_key_env
+    if args.base_url_env:
+        params["base_url_env"] = args.base_url_env
+
+    model_info = resolve_model(params["model"])
 
     # Inform the user how many new LLM calls will be made (cache-aware) and require confirmation.
     cache_path = Path(params["output_responses"])
-    cached = load_existing_jsonl(cache_path, expected_model=params["model"])
+    cached = load_existing_jsonl(cache_path, expected_model=model_info.model)
 
     seed_df = load_seed_titles(Path("synthetic_data/data/seed_titles.csv"))
     pending_calls = sum(1 for title in seed_df["seed_title"] if title not in cached)
 
     if not args.yes:
         prompt = (
-            f"You are about to make {pending_calls} LLM calls with model '{params['model']}' "
+            f"You are about to make {pending_calls} LLM calls with model '{model_info.model}' "
             f"({len(seed_df)} seeds; {len(cached)} cached). Proceed? [y/N] "
         )
         if input(prompt).strip().lower() not in {"y", "yes"}:
