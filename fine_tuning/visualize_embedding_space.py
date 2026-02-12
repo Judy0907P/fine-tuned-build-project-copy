@@ -11,7 +11,12 @@ from fine_tuning.train import load_params, tsne_plot, _get_device
 
 def main():
     parser = argparse.ArgumentParser(description="Regenerate t-SNE plot for embeddings.")
-    parser.add_argument("--params", type=Path, default=Path("params.yaml"))
+    parser.add_argument(
+        "--params",
+        type=str,
+        default="params.fine_tuning",
+        help="YAML selector '<file>.<section>' or '<file.yaml>:<section>' (e.g., params.fine_tuning)",
+    )
     parser.add_argument(
         "--dataset",
         type=Path,

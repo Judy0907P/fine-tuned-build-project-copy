@@ -145,20 +145,41 @@ def build_messages(seed_title: str, num_examples: int) -> List[Dict[str, str]]:
     ]
 
 
+def normalize_openai_reasoning_effort(model_name: str, reasoning_effort: Optional[str]) -> Optional[str]:
+    """
+    Normalize reasoning effort for model-specific OpenAI compatibility.
+    - gpt-5.2: "minimal" is not accepted -> use "none"
+    - gpt-5-mini: "none" is not accepted -> use "minimal"
+    """
+    if reasoning_effort is None:
+        return None
+
+    effort = reasoning_effort.strip().lower()
+    model = model_name.strip().lower()
+
+    if model == "gpt-5.2" and effort == "minimal":
+        return "none"
+    if model == "gpt-5-mini" and effort == "none":
+        return "minimal"
+    return effort
+
+
 async def request_openai(
     client,
     model: str,
     seed_title: str,
     num_examples: int,
     temperature: Optional[float],
-    reasoning_effort: str,
+    reasoning_effort: Optional[str],
 ) -> TitleVariants:
+    normalized_effort = normalize_openai_reasoning_effort(model, reasoning_effort)
     kwargs = {
         "model": model,
         "messages": build_messages(seed_title, num_examples),
         "response_format": {"type": "json_object"},
-        "reasoning_effort": reasoning_effort,
     }
+    if normalized_effort is not None:
+        kwargs["reasoning_effort"] = normalized_effort
     if temperature is not None:
         kwargs["temperature"] = temperature
 
