@@ -1,0 +1,8 @@
+sentence-transformers
+torch
+numpy
+pandas
+pyarrow
+scikit-learn
+scipy
+safetensors
